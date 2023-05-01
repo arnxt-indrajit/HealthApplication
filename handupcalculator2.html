@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MoveNet Body Detection</title>
+    <style>
+      #hands-up-counter {
+        font-size: 24px;
+  font-weight: bold;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  background-color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <div id="hands-up-counter">Kalu</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+
+    <script>
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const counterEl = document.getElementById('hands-up-counter');
+
+      const detectorConfig = {modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING};
+      poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, detectorConfig)
+        .then(detector => {
+          navigator.mediaDevices.getUserMedia({video: true})
+            .then(stream => {
+              video.srcObject = stream;
+              video.onloadedmetadata = () => {
+                video.play();
+                detectPoseInRealTime(video, detector);
+              }
+            })
+        });
+
+        function detectPoseInRealTime(video, detector) {
+  const FPS = 30;
+
+  // Define the keypoints that correspond to the bones we want to draw
+  const BONES = [
+    [0, 1],[1, 3],[0, 2],[2, 4],[0, 5],[5, 7],[7, 9],[0, 6],[6, 8],[8, 10],[5, 6],[11, 12],[11, 13],[13, 15],[12, 14],[14, 16]
+  ];
+
+  let handUp = false;
+  let count = 0;
+
+  setInterval(async () => {
+    const poses = await detector.estimatePoses(video);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    poses.forEach(pose => {
+      BONES.forEach(([i, j]) => {
+        const keypoint1 = pose.keypoints[i];
+        const keypoint2 = pose.keypoints[j];
+
+        if (keypoint1.score >= 0.5 && keypoint2.score >= 0.5) {
+          const x1 = keypoint1.x;
+          const y1 = keypoint1.y;
+          const x2 = keypoint2.x;
+          const y2 = keypoint2.y;
+
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#ff0000';
+          ctx.stroke();
+        }
+      });
+
+      // Check if the left hand is up
+      const leftWrist = pose.keypoints[9];
+      const leftShoulder = pose.keypoints[5];
+      if (leftWrist.score >= 0.5 && leftShoulder.score >= 0.5) {
+        if (leftWrist.y < leftShoulder.y) {
+          if (!handUp) {
+            // If the hand is up and this is the first time, increment the count
+            count++;
+            handUp = true;
+            ctx.font = "20px Arial";
+            ctx.fillStyle = "#000000";
+            ctx.fillText(`Hands up count: ${count}`, 10, 30);
+            updateCount(count);
+            console.log(count)
+          }
+        } else {
+          handUp = false;
+        }
+      }
+    });
+  }, 1000 / FPS);
+
+  function updateCount(count) {
+    
+    console.log(count)
+    counterEl.innerText = `Hands up count: ${count}`;
+
+    
+  }
+}
+
+
+
+</script>
+
+</html>

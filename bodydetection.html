@@ -1,0 +1,56 @@
+
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>MoveNet Body Detection</title>
+  </head>
+  <body>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+
+    <script>
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+      const detectorConfig = {modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING};
+      poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, detectorConfig)
+        .then(detector => {
+          navigator.mediaDevices.getUserMedia({video: true})
+            .then(stream => {
+              video.srcObject = stream;
+              video.onloadedmetadata = () => {
+                video.play();
+                detectPoseInRealTime(video, detector);
+              }
+            })
+        });
+
+      function detectPoseInRealTime(video, detector) {
+        const FPS = 30;
+        setInterval(async () => {
+          const poses = await detector.estimatePoses(video);
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          poses.forEach(pose => {
+            pose.keypoints.forEach(keypoint => {
+              ctx.beginPath();
+              ctx.arc(keypoint.x, keypoint.y, 5, 0, 2 * Math.PI);
+              ctx.fillStyle = 'red';
+              ctx.fill();
+            });
+          });
+        }, 1000 / FPS);
+      }
+    </script>
+  </body>
+</html>
+
